@@ -1,28 +1,23 @@
 #!/bin/bash
-set -e
 
-########################################
-# 1. Run provisioning (NO automatic model download)
-########################################
-bash /workspace/provisioning_fluxx.sh
+echo "Starting FluXXX environment..."
+mkdir -p /workspace/logs  # ✅ Ensure logs directory exists
 
-########################################
-# 2. Start Ollama FIRST (background), so OpenWebUI can see it
-########################################
-ollama serve --port 11434 &
+# Trap SIGTERM for clean shutdown
+trap 'echo "Stopping FluXXX..."; supervisorctl shutdown; exit 0' SIGTERM
 
-########################################
-# 3. Start ComfyUI (background)
-########################################
-python3 /workspace/ComfyUI/main.py --listen 0.0.0.0 --port 8188 &
+# Start Supervisor
+echo "Starting supervisor..."
+/usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
 
-########################################
-# 4. Finally, run OpenWebUI in FOREGROUND
-########################################
-cd /workspace/open-webui
-./webui.sh --listen 0.0.0.0 --port 7500
+# Wait for all services to be ready
+sleep 2
 
-########################################
-# 5. User must manually run model download script now:
-# bash /workspace/download_models.sh
-########################################
+echo "Checking service status..."
+if ! supervisorctl status | grep -q "RUNNING"; then
+    echo "Error: One or more services failed to start!"
+    exit 1
+fi
+
+echo "All services running successfully!"
+tail -f /workspace/logs/*.log
