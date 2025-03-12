@@ -3,7 +3,7 @@
 COMFYUI_DIR="/workspace/ComfyUI"
 
 APT_PACKAGES=(git wget curl unzip python3 python3-pip aria2)
-PIP_PACKAGES=(torch==2.1.0 torchvision==0.16.0)
+PIP_PACKAGES=(torch==2.2.0 torchvision==0.17.0 safetensors)
 NODES=(
     "https://github.com/ltdrdata/ComfyUI-Manager"
     "https://github.com/cubiq/ComfyUI_essentials"

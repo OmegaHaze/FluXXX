@@ -1,42 +1,55 @@
-# Use CUDA base image
+# Updated Dockerfile
 FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04 AS base
 
 ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /workspace
 
-# 1. Install all dependencies in a single step
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git wget curl unzip python3 python3-pip sudo aria2 npm supervisor && \
+    git wget curl unzip python3 python3-pip aria2 npm supervisor net-tools iproute2 jq && \
     ln -s /usr/bin/python3 /usr/bin/python && \
     rm -rf /var/lib/apt/lists/* /tmp/*
 
-# 2. Fix Node.js Installation Issues
+# Fix Node.js installation
 RUN apt-get remove -y nodejs libnode-dev npm && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y nodejs && \
+    npm install -g npm@latest && \
     node -v && npm -v
 
-# 3. Clone repositories (shallow clone for speed)
+# Clone repositories
 RUN git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git /workspace/ComfyUI && \
     git clone --depth 1 https://github.com/open-webui/open-webui.git /workspace/open-webui
 
-# 4. Install PyTorch with CUDA compatibility
-RUN pip install --no-cache-dir torch==2.1.0 torchvision==0.16.0 --extra-index-url https://download.pytorch.org/whl/cu121
+# Install ComfyUI Python dependencies using its official requirements.txt
+WORKDIR /workspace/ComfyUI
+RUN pip install -r requirements.txt
 
-# 5. Fix JavaScript Heap Out of Memory (Increase Node.js Memory)
+# Optionally, install additional packages not in requirements.txt (if needed)
+# For example, if safetensors isn’t included or you need to force numpy<2:
+RUN pip install safetensors "numpy<2"
+
+# Fix OpenWebUI build
 WORKDIR /workspace/open-webui
-RUN npm install && \
-    NODE_OPTIONS="--max-old-space-size=4096" npm run build && \
+# Increase Node memory, install and build, then update package.json via jq
+RUN export NODE_OPTIONS="--max-old-space-size=8192" && \
+    npm install && npm run build && \
+    jq '.scripts.start = "vite"' package.json > package_tmp.json && \
+    mv package_tmp.json package.json && \
     rm -rf /root/.npm
 
-# 6. Install Ollama (Fix missing Ollama)
-RUN curl -fsSL https://ollama.com/install.sh | sh
+# Install Ollama using the official install script and verify installation
+RUN curl -fsSL https://ollama.com/install.sh | sh && \
+    ollama --version
 
-# 7. Copy provisioning + entrypoint scripts and set permissions
+# Copy additional scripts and supervisor configuration
 WORKDIR /workspace
-COPY provisioning_fluxx.sh download_models.sh supervisord.conf /workspace/
+COPY provisioning_fluxx.sh download_models.sh /workspace/
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 RUN chmod +x /workspace/*.sh
 
-# 8. Start supervisor
+# Ensure logs directory exists
+RUN mkdir -p /workspace/logs
+
+# Start supervisor
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

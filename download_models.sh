@@ -21,19 +21,27 @@ function download_models() {
     for url in "${urls[@]}"; do
         file_name="$(basename "$url")"
         file_path="${dir}/${file_name}"
+        sha_path="${file_path}.sha256"
 
         if [[ -f "${file_path}" ]]; then
             echo "Verifying file integrity for: ${file_name}"
-            if ! sha256sum -c "${file_path}.sha256" --status 2>/dev/null; then
-                echo "Corrupt file detected, re-downloading: ${file_name}"
-                rm -f "${file_path}"
-                aria2c --max-tries=5 --retry-wait=10 -x 16 -s 16 -d "${dir}" "${url}"
+            if [[ -f "${sha_path}" ]]; then
+                if ! sha256sum -c "${sha_path}" --status 2>/dev/null; then
+                    echo "Corrupt file detected, re-downloading: ${file_name}"
+                    rm -f "${file_path}" "${sha_path}"
+                    aria2c --max-tries=5 --retry-wait=10 -x 16 -s 16 -d "${dir}" "${url}"
+                else
+                    echo "File verified: ${file_name}"
+                fi
             else
-                echo "File verified: ${file_name}"
+                echo "SHA256 file missing for ${file_name}, recalculating hash..."
+                sha256sum "${file_path}" | awk '{print $1}' > "${sha_path}"
+                echo "SHA256 file created for: ${file_name}"
             fi
         else
             echo "Downloading: ${file_name}"
             aria2c --max-tries=5 --retry-wait=10 -x 16 -s 16 -d "${dir}" "${url}"
+            sha256sum "${file_path}" | awk '{print $1}' > "${sha_path}"
         fi
     done
 }
