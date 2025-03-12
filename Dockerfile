@@ -21,22 +21,32 @@ RUN apt-get remove -y nodejs libnode-dev npm && \
 RUN git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git /workspace/ComfyUI && \
     git clone --depth 1 https://github.com/open-webui/open-webui.git /workspace/open-webui
 
-# Install ComfyUI Python dependencies using its official requirements.txt
-WORKDIR /workspace/ComfyUI
-RUN pip install -r requirements.txt
+# Copy additional scripts before execution
+COPY provisioning_fluxx.sh download_models.sh /workspace/
+RUN chmod +x /workspace/provisioning_fluxx.sh
 
-# Optionally, install additional packages not in requirements.txt (if needed)
-# For example, if safetensors isn’t included or you need to force numpy<2:
-RUN pip install safetensors "numpy<2"
+# Install ComfyUI dependencies inside provisioning script
+WORKDIR /workspace
+RUN /workspace/provisioning_fluxx.sh
 
 # Fix OpenWebUI build
 WORKDIR /workspace/open-webui
-# Increase Node memory, install and build, then update package.json via jq
+
+# 🔹 Remove this (no need to force `vite` mode, let Supervisor handle it)
+# RUN jq '.scripts.start = "vite"' package.json > package_tmp.json && \
+#     mv package_tmp.json package.json
+
+# 🔹 Increase Node memory, install dependencies, and build frontend
 RUN export NODE_OPTIONS="--max-old-space-size=8192" && \
-    npm install && npm run build && \
-    jq '.scripts.start = "vite"' package.json > package_tmp.json && \
-    mv package_tmp.json package.json && \
-    rm -rf /root/.npm
+    npm install && npm run build
+
+# 🔹 Ensure OpenWebUI respects `--port 7500 --host 0.0.0.0`
+RUN echo "PORT=7500" > /workspace/open-webui/.env && \
+    echo "HOST=0.0.0.0" >> /workspace/open-webui/.env
+
+# 🔹 Install OpenWebUI backend dependencies
+WORKDIR /workspace/open-webui/backend
+RUN pip install -r requirements.txt
 
 # Install Ollama using the official install script and verify installation
 RUN curl -fsSL https://ollama.com/install.sh | sh && \
@@ -50,6 +60,18 @@ RUN chmod +x /workspace/*.sh
 
 # Ensure logs directory exists
 RUN mkdir -p /workspace/logs
+
+# Copy entrypoint script and set permissions
+COPY entrypoint.sh /workspace/entrypoint.sh
+RUN chmod +x /workspace/entrypoint.sh
+
+# 🔹 Set default environment variables
+ENV PORT=7500 \
+    HOST=0.0.0.0 \
+    PYTHONUNBUFFERED=1
+
+# Set the entrypoint and default command
+ENTRYPOINT ["/workspace/entrypoint.sh"]
 
 # Start supervisor
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
