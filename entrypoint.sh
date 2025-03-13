@@ -6,7 +6,14 @@ echo "🚀 Initializing provisioning script for FluXXX..."
 mkdir -p /workspace/logs
 
 # Download the actual entrypoint script
-curl -o /workspace/entrypoint.sh https://raw.githubusercontent.com/OmegaHaze/FluXXX/main/entrypoint.sh
+echo "🔽 Downloading entrypoint script..."
+curl -fsSL -o /workspace/entrypoint.sh https://raw.githubusercontent.com/OmegaHaze/FluXXX/main/entrypoint.sh
+
+# Verify the file exists after download
+if [[ ! -f /workspace/entrypoint.sh ]]; then
+    echo "❌ ERROR: entrypoint.sh was not downloaded!"
+    exit 1
+fi
 
 # Make it executable
 chmod +x /workspace/entrypoint.sh
