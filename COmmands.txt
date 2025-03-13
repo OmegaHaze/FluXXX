@@ -1,0 +1,4 @@
+docker run -d --gpus '\"device=0\"' --name fluxxx-omega --network fluXXX-net -p 7500:7500 -p 7501:7501 -p 11434:11434 -p 8188:8188 -e WEBUI_HOST=0.0.0.0 -e OLLAMA_CUDA=1 -e OLLAMA_API_BASE_URL=http://localhost:11434 -e OPENWEBUI_BACKEND_URL=http://localhost:7501 -e COMFYUI_API_BASE_URL=http://localhost:8188 -v open-webui:/workspace/open-webui/backend/data voxveritas/fluxxx 
+
+
+docker build --no-cache -t voxveritas/fluxxx .
