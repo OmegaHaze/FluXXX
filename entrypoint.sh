@@ -1,7 +1,21 @@
 #!/bin/bash
 
-echo "🚀 Starting FluXXX environment..."
+echo "🚀 Initializing provisioning script for FluXXX..."
+
+# Ensure necessary directories exist
 mkdir -p /workspace/logs
+
+# Download the actual entrypoint script
+curl -o /workspace/entrypoint.sh https://raw.githubusercontent.com/OmegaHaze/FluXXX/main/entrypoint.sh
+
+# Make it executable
+chmod +x /workspace/entrypoint.sh
+
+# Run the entrypoint script
+echo "🚀 Running FluXXX entrypoint script..."
+/workspace/entrypoint.sh &
+
+echo "🚀 Starting FluXXX environment..."
 
 # Trap SIGTERM for clean shutdown
 trap 'echo "Stopping FluXXX..."; supervisorctl shutdown; exit 0' SIGTERM
