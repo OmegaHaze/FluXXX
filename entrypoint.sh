@@ -2,10 +2,10 @@
 
 echo "🚀 Initializing provisioning script for FluXXX..."
 
-# Prevent multiple executions
+# Lock file to prevent multiple executions
 LOCK_FILE="/workspace/provisioning.lock"
 if [ -f "$LOCK_FILE" ]; then
-    echo "⚠️ Provisioning script is already running! Exiting..."
+    echo "⚠️ Provisioning script already ran. Exiting..."
     exit 0
 fi
 touch "$LOCK_FILE"
@@ -13,16 +13,22 @@ touch "$LOCK_FILE"
 # Ensure necessary directories exist
 mkdir -p /workspace/logs
 
-# Kill existing Supervisor process (if any)
+# Check if Supervisor is already running
 if pgrep supervisord > /dev/null; then
-    echo "⚠️ Stopping existing Supervisor instance..."
-    pkill supervisord
-    sleep 2
+    echo "⚠️ Supervisor is already running. Skipping restart..."
+else
+    echo "✅ Starting Supervisor..."
+    /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
 fi
 
-# Download the actual entrypoint script only if not present
-echo "🔽 Downloading entrypoint script..."
-curl -fsSL -o /workspace/entrypoint.sh https://raw.githubusercontent.com/OmegaHaze/FluXXX/main/entrypoint.sh
+# Remove lock file on exit (ensures clean state on restart)
+trap 'rm -f $LOCK_FILE' EXIT
+
+# Download entrypoint script ONLY if it's missing
+if [[ ! -f /workspace/entrypoint.sh ]]; then
+    echo "🔽 Downloading entrypoint script..."
+    curl -fsSL -o /workspace/entrypoint.sh https://raw.githubusercontent.com/OmegaHaze/FluXXX/main/entrypoint.sh
+fi
 
 # Verify the file exists after download
 if [[ ! -f /workspace/entrypoint.sh ]]; then
@@ -33,40 +39,16 @@ fi
 # Make it executable
 chmod +x /workspace/entrypoint.sh
 
-# Run the entrypoint script (only once)
+# Run the entrypoint script
 echo "🚀 Running FluXXX entrypoint script..."
-/workspace/entrypoint.sh &
+nohup /workspace/entrypoint.sh > /workspace/logs/entrypoint.log 2>&1 &
 
-echo "🚀 Starting FluXXX environment..."
-
-# Start Supervisor
-echo "✅ Starting Supervisor..."
-/usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf &
-
-# Wait for Supervisor to fully initialize
-sleep 5  
-
-# Ensure Supervisor socket is ready
-count=0
-while [ ! -S /var/run/supervisor.sock ]; do
-    if [[ $count -ge 15 ]]; then
-        echo "❌ ERROR: Supervisor socket never appeared!"
-        exit 1
-    fi
-    echo "⏳ Waiting for Supervisor socket..."
-    sleep 1
-    ((count++))
-done
-
-echo "✅ Supervisor socket detected."
-
-# Validate services
-echo "🔍 Checking service status..."
-if ! supervisorctl status | grep -q "RUNNING"; then
-    echo "❌ ERROR: One or more services failed to start!"
-    supervisorctl status
+# Validate Supervisor
+sleep 5
+if ! pgrep supervisord > /dev/null; then
+    echo "❌ ERROR: Supervisor failed to start!"
     exit 1
 fi
 
-echo "✅ All services running successfully!"
+echo "✅ Supervisor running!"
 tail -f /workspace/logs/*.log
