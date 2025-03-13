@@ -2,6 +2,14 @@
 
 echo "🚀 Initializing provisioning script for FluXXX..."
 
+# Prevent multiple executions
+LOCK_FILE="/workspace/provisioning.lock"
+if [ -f "$LOCK_FILE" ]; then
+    echo "⚠️ Provisioning script is already running! Exiting..."
+    exit 0
+fi
+touch "$LOCK_FILE"
+
 # Ensure necessary directories exist
 mkdir -p /workspace/logs
 
@@ -12,7 +20,7 @@ if pgrep supervisord > /dev/null; then
     sleep 2
 fi
 
-# Download the actual entrypoint script
+# Download the actual entrypoint script only if not present
 echo "🔽 Downloading entrypoint script..."
 curl -fsSL -o /workspace/entrypoint.sh https://raw.githubusercontent.com/OmegaHaze/FluXXX/main/entrypoint.sh
 
@@ -25,14 +33,11 @@ fi
 # Make it executable
 chmod +x /workspace/entrypoint.sh
 
-# Run the entrypoint script
+# Run the entrypoint script (only once)
 echo "🚀 Running FluXXX entrypoint script..."
 /workspace/entrypoint.sh &
 
 echo "🚀 Starting FluXXX environment..."
-
-# Trap SIGTERM for clean shutdown
-trap 'echo "Stopping FluXXX..."; supervisorctl shutdown; exit 0' SIGTERM
 
 # Start Supervisor
 echo "✅ Starting Supervisor..."
