@@ -5,6 +5,13 @@ echo "🚀 Initializing provisioning script for FluXXX..."
 # Ensure necessary directories exist
 mkdir -p /workspace/logs
 
+# Kill existing Supervisor process (if any)
+if pgrep supervisord > /dev/null; then
+    echo "⚠️ Stopping existing Supervisor instance..."
+    pkill supervisord
+    sleep 2
+fi
+
 # Download the actual entrypoint script
 echo "🔽 Downloading entrypoint script..."
 curl -fsSL -o /workspace/entrypoint.sh https://raw.githubusercontent.com/OmegaHaze/FluXXX/main/entrypoint.sh
