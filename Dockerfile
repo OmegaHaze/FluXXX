@@ -11,66 +11,61 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 WORKDIR /workspace
 
-# Install essential utilities + Python 3.11
+# Install essential utilities and Python
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git wget curl unzip netcat-traditional aria2 jq supervisor net-tools iproute2 \
+    git wget curl unzip netcat-traditional aria2 jq supervisor net-tools iproute2 ca-certificates \
     python3.11 python3.11-venv python3.11-dev python3-pip npm ffmpeg && \
     update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 && \
     update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
-    update-alternatives --set python /usr/bin/python3.11 && \
-    update-alternatives --set python3 /usr/bin/python3.11 && \
     rm -rf /var/lib/apt/lists/* /tmp/*
 
-
-# Ensure pip is up to date
-RUN python --version && pip install --upgrade pip setuptools wheel
+# Upgrade pip
+RUN pip install --upgrade pip setuptools wheel
 
 # ========================
-# 🔹 COMFYUI (Using Official Image)
+# 🔹 COMFYUI
 # ========================
 FROM ghcr.io/lecode-official/comfyui-docker:latest AS comfyui
 
 # ========================
-# 🔹 OLLAMA (Using Official Image)
-# ========================
-FROM ollama/ollama:latest AS ollama
-
-# ========================
-# 🔹 OPENWEBUI (Using Official Image)
+# 🔹 OPENWEBUI
 # ========================
 FROM ghcr.io/open-webui/open-webui:git-d84e7d1-cuda AS openwebui
 
 # ========================
-# 🔥 FINAL IMAGE (Combining All Services)
+# 🔥 FINAL IMAGE
 # ========================
 FROM base AS final
 
-# Copy services
+# Copy ComfyUI and OpenWebUI from official images
 COPY --from=comfyui /opt/comfyui /workspace/ComfyUI
-COPY --from=ollama /usr/bin/ollama /usr/bin/ollama
 COPY --from=openwebui /app /workspace/open-webui
+
+# 🔥 Install Ollama via the official installation script (CUDA-enabled)
+RUN curl -fsSL https://ollama.com/install.sh | sh && \
+    ln -sf /usr/local/bin/ollama /usr/bin/ollama
 
 # Copy scripts
 COPY provisioning_fluxx.sh download_models.sh install_dependencies.sh /workspace/
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY entrypoint.sh /workspace/entrypoint.sh
 
-# Ensure permissions
+# Permissions
 RUN chmod +x /workspace/*.sh /workspace/entrypoint.sh
 
-# Install dependencies
+# Install additional dependencies
 RUN /workspace/install_dependencies.sh
 
-# ✅ Install missing dependencies
+# Python requirements for OpenWebUI and ComfyUI
 RUN pip install --no-cache-dir -r /workspace/open-webui/backend/requirements.txt \
-                 -r /workspace/ComfyUI/requirements.txt \
-                 pyyaml
+                               -r /workspace/ComfyUI/requirements.txt \
+                               pyyaml
 
-# Ensure logs directory exists
+# Logs directory
 RUN mkdir -p /workspace/logs
 
-# Set the entrypoint
+# Set entrypoint
 ENTRYPOINT ["/workspace/entrypoint.sh"]
 
-# Start Supervisor
+# Supervisor as CMD
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
