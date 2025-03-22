@@ -72,7 +72,13 @@ RUN chmod -R 755 /workspace/qdrant && \
     chown -R root:root /workspace/.n8n
 
 # Copy scripts and supervisor config
-COPY provisioning_fluxx.sh download_models.sh install_dependencies.sh /workspace/
+COPY provisioning_fluxx.sh \
+     download_models.sh \
+     install_dependencies.sh \
+     start-openwebiu.sh \
+     start-n8n.sh \
+     /workspace/
+
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY entrypoint.sh /workspace/entrypoint.sh
 
