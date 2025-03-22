@@ -1,7 +1,17 @@
 #!/bin/bash
 
+export $(grep -v '^#' /workspace/.env | xargs)
+
 echo "🚀 Starting FluXXX environment..."
 mkdir -p /workspace/logs
+
+# ✅ Trust internal/self-signed certs if mounted
+if [ -d /opt/custom-certificates ]; then
+  echo "🔐 Trusting custom certificates from /opt/custom-certificates."
+  export NODE_OPTIONS="--use-openssl-ca $NODE_OPTIONS"
+  export SSL_CERT_DIR=/opt/custom-certificates
+  c_rehash /opt/custom-certificates
+fi
 
 # Trap SIGTERM for clean shutdown
 trap 'echo "Stopping FluXXX..."; supervisorctl shutdown; exit 0' SIGTERM
@@ -30,6 +40,8 @@ echo "✅ Supervisor socket detected."
 # Validate services
 echo "🔍 Checking service status..."
 if ! supervisorctl status | grep -q "RUNNING"; then
+    echo "❌ Services not running:"
+    supervisorctl status
     echo "❌ ERROR: One or more services failed to start!"
     supervisorctl status
     exit 1

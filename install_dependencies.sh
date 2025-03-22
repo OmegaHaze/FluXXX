@@ -17,4 +17,7 @@ pip install --no-cache-dir -r /workspace/ComfyUI/requirements.txt \
                            -r /workspace/open-webui/backend/requirements.txt \
                            pyyaml
 
+# Install Qdrant dependencies
+pip install --no-cache-dir qdrant-client
+
 echo "✅ Dependencies installed successfully!"
