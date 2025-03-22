@@ -13,6 +13,9 @@ if [ -d /opt/custom-certificates ]; then
   c_rehash /opt/custom-certificates
 fi
 
+# Ensure all entrypoint scripts have the right permissions
+chmod +x /workspace/*.sh
+
 # Trap SIGTERM for clean shutdown
 trap 'echo "Stopping FluXXX..."; supervisorctl shutdown; exit 0' SIGTERM
 
